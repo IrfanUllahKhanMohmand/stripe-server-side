@@ -85,6 +85,7 @@ app.get('/stripe-key', (req, res) => {
   });
   
   app.post('/create-payment-intent', async (req, res) => {
+    try {
     const {
       email,
       items,
@@ -122,7 +123,7 @@ app.get('/stripe-key', (req, res) => {
       payment_method_types: payment_method_types,
     };
   
-    try {
+    
       const paymentIntent = await stripe.paymentIntents.create(params);
       res.send({
         clientSecret: paymentIntent.client_secret,
@@ -136,6 +137,7 @@ app.get('/stripe-key', (req, res) => {
   
 
   app.post('/create-payment-intent-with-payment-method', async (req, res) => {
+    try {
     const {
       items,
       currency,
@@ -187,6 +189,12 @@ app.get('/stripe-key', (req, res) => {
       clientSecret: paymentIntent.client_secret,
       paymentMethodId: paymentMethods.data[0].id,
     });
+
+  } catch (error) {
+    res.send({
+      error: error.message,
+    });
+  }
   });
   
 
@@ -292,6 +300,7 @@ app.post(
 );
 
 app.post('/create-setup-intent', async (req, res) => {
+  try {
   const {
     email,
     payment_method_types = [],
@@ -331,6 +340,11 @@ app.post('/create-setup-intent', async (req, res) => {
     publishableKey: process.env.STRIPE_PUBLISHABLE_KEY,
     clientSecret: setupIntent.client_secret,
   });
+} catch (error) {
+  res.send({
+    error: error.message,
+  });
+}
 });
 
 // Expose a endpoint as a webhook handler for asynchronous events.
@@ -480,104 +494,130 @@ app.post('/charge-card-off-session', async (req, res) => {
 // This example sets up an endpoint using the Express framework.
 // Watch this video to get started: https://youtu.be/rPR2aJ6XnAc.
 
+
+
 app.post('/payment-sheet', async (_, res) => {
-  const { secret_key } = getKeys();
+  try {
+    const { secret_key } = getKeys();
 
-  const stripe = new Stripe(secret_key, {
-    apiVersion: '2023-08-16',
-    typescript: true,
-  });
-
-  const customers = await stripe.customers.list();
-
-  // Here, we're getting latest customer only for example purposes.
-  const customer = customers.data[0];
-
-  if (!customer) {
-    return res.send({
-      error: 'You have no customer created',
+    const stripe = new Stripe(secret_key, {
+      apiVersion: '2023-08-16',
+      typescript: true,
     });
-  }
 
-  const ephemeralKey = await stripe.ephemeralKeys.create(
-    { customer: customer.id },
-    { apiVersion: '2023-08-16' }
-  );
-  const paymentIntent = await stripe.paymentIntents.create({
-    amount: 5099,
-    currency: 'eur',
-    customer: customer.id,
-    // Edit the following to support different payment methods in your PaymentSheet
-    // Note: some payment methods have different requirements: https://stripe.com/docs/payments/payment-methods/integration-options
-    payment_method_types: [
-      'card',
-      // 'ideal',
-      // 'sepa_debit',
-      // 'sofort',
-      // 'bancontact',
-      // 'p24',
-      // 'giropay',
-      // 'eps',
-      // 'afterpay_clearpay',
-      // 'klarna',
-      // 'us_bank_account',
-    ],
-  });
-  return res.json({
-    paymentIntent: paymentIntent.client_secret,
-    ephemeralKey: ephemeralKey.secret,
-    customer: customer.id,
-  });
-});
+    const customers = await stripe.customers.list();
 
-app.post('/payment-sheet-subscription', async (_, res) => {
-  const { secret_key } = getKeys();
+    // Here, we're getting the latest customer only for example purposes.
+    const customer = customers.data[0];
 
-  const stripe = new Stripe(secret_key, {
-    apiVersion: '2023-08-16',
-    typescript: true,
-  });
+    if (!customer) {
+      return res.send({
+        error: 'You have no customer created',
+      });
+    }
 
-  const customers = await stripe.customers.list();
-
-  // Here, we're getting latest customer only for example purposes.
-  const customer = customers.data[0];
-
-  if (!customer) {
-    return res.send({
-      error: 'You have no customer created',
-    });
-  }
-
-  const ephemeralKey = await stripe.ephemeralKeys.create(
-    { customer: customer.id },
-    { apiVersion: '2023-08-16' }
-  );
-  const subscription = await stripe.subscriptions.create({
-    customer: customer.id,
-    items: [{ price: 'price_1L3hcFLu5o3P18Zp9GDQEnqe' }],
-    trial_period_days: 3,
-  });
-
-  if (typeof subscription.pending_setup_intent === 'string') {
-    const setupIntent = await stripe.setupIntents.retrieve(
-      subscription.pending_setup_intent
+    const ephemeralKey = await stripe.ephemeralKeys.create(
+      { customer: customer.id },
+      { apiVersion: '2023-08-16' }
     );
 
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: 5099,
+      currency: 'eur',
+      customer: customer.id,
+      payment_method_types: ['card'],
+    });
+
     return res.json({
-      setupIntent: setupIntent.client_secret,
+      paymentIntent: paymentIntent.client_secret,
       ephemeralKey: ephemeralKey.secret,
       customer: customer.id,
     });
-  } else {
-    throw new Error(
-      'Expected response type string, but received: ' +
-        typeof subscription.pending_setup_intent
-    );
+  } catch (error) {
+    console.error('Error in payment-sheet endpoint:', error);
+
+    // Handle different types of errors and respond accordingly
+    if (error instanceof Stripe.errors.StripeCardError) {
+      // Handle card errors
+      return res.status(400).json({ error: 'Card error' });
+    } else if (error instanceof Stripe.errors.StripeInvalidRequestError) {
+      // Handle invalid request errors
+      return res.status(400).json({ error: 'Invalid request' });
+    } else {
+      // Handle other types of errors
+      return res.status(500).json({ error: 'Internal server error' });
+    }
   }
 });
 
+
+app.post('/payment-sheet-subscription', async (_, res) => {
+  try {
+    const { secret_key } = getKeys();
+
+    const stripe = new Stripe(secret_key, {
+      apiVersion: '2023-08-16',
+      typescript: true,
+    });
+
+    const customers = await stripe.customers.list();
+
+    // Here, we're getting the latest customer only for example purposes.
+    const customer = customers.data[0];
+
+    if (!customer) {
+      return res.send({
+        error: 'You have no customer created',
+      });
+    }
+
+    const ephemeralKey = await stripe.ephemeralKeys.create(
+      { customer: customer.id },
+      { apiVersion: '2023-08-16' }
+    );
+
+    const subscription = await stripe.subscriptions.create({
+      customer: customer.id,
+      items: [{ price: 'price_1L3hcFLu5o3P18Zp9GDQEnqe' }],
+      trial_period_days: 3,
+    });
+
+    if (typeof subscription.pending_setup_intent === 'string') {
+      const setupIntent = await stripe.setupIntents.retrieve(
+        subscription.pending_setup_intent
+      );
+
+      return res.json({
+        setupIntent: setupIntent.client_secret,
+        ephemeralKey: ephemeralKey.secret,
+        customer: customer.id,
+      });
+    } else {
+      throw new Error(
+        'Expected response type string, but received: ' +
+          typeof subscription.pending_setup_intent
+      );
+    }
+  } catch (error) {
+    console.error('Error in payment-sheet-subscription endpoint:', error);
+
+    // Handle different types of errors and respond accordingly
+    if (error instanceof Stripe.errors.StripeCardError) {
+      // Handle card errors
+      return res.status(400).json({ error: 'Card error' });
+    } else if (error instanceof Stripe.errors.StripeInvalidRequestError) {
+      // Handle invalid request errors
+      return res.status(400).json({ error: 'Invalid request' });
+    } else {
+      // Handle other types of errors
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+});
+
+
 app.post('/ephemeral-key', async (req, res) => {
+  try {
   const { secret_key } = getKeys();
 
   const stripe = new Stripe(secret_key, {
@@ -585,7 +625,7 @@ app.post('/ephemeral-key', async (req, res) => {
     typescript: true,
   });
 
-  try {
+  
     let key = await stripe.ephemeralKeys.create(
       { issuing_card: req.body.issuingCardId },
       { apiVersion: req.body.apiVersion }
@@ -598,6 +638,7 @@ app.post('/ephemeral-key', async (req, res) => {
 });
 
 app.post('/issuing-card-details', async (req, res) => {
+  try {
   const { secret_key } = getKeys();
 
   const stripe = new Stripe(secret_key, {
@@ -605,7 +646,7 @@ app.post('/issuing-card-details', async (req, res) => {
     typescript: true,
   });
 
-  try {
+  
     let card = await stripe.issuing.cards.retrieve(req.body.id);
 
     if (!card) {
@@ -621,6 +662,7 @@ app.post('/issuing-card-details', async (req, res) => {
 });
 
 app.post('/financial-connections-sheet', async (_, res) => {
+  try {
   const { secret_key } = getKeys();
 
   const stripe = new Stripe(secret_key, {
@@ -644,9 +686,15 @@ app.post('/financial-connections-sheet', async (_, res) => {
   });
 
   return res.send({ clientSecret: session.client_secret });
+} catch (error) {
+  res.send({
+    error: error.message,
+  });
+}
 });
 
 app.post('/payment-intent-for-payment-sheet', async (req, res) => {
+  try {
   const { secret_key } = getKeys();
 
   const stripe = new Stripe(secret_key, {
@@ -654,7 +702,7 @@ app.post('/payment-intent-for-payment-sheet', async (req, res) => {
     typescript: true,
   });
 
-  try {
+
     const paymentIntent = await stripe.paymentIntents.create({
       amount: 5099,
       currency: 'usd',
@@ -669,6 +717,7 @@ app.post('/payment-intent-for-payment-sheet', async (req, res) => {
 });
 
 app.post('/create-checkout-session', async (req, res) => {
+  try {
   console.log(`Called /create-checkout-session`)
   const {
     port,
@@ -700,9 +749,15 @@ app.post('/create-checkout-session', async (req, res) => {
     ephemeralKeySecret: ephemeralKey.secret,
     setupIntent: setupIntent.client_secret,
   });
+} catch (error) {
+  res.json({
+    error: error.message,
+  });
+}
 });
 
 app.post('/customer-sheet', async (_, res) => {
+  try {
   const { secret_key } = getKeys();
 
   const stripe = new Stripe(secret_key, {
@@ -728,9 +783,15 @@ app.post('/customer-sheet', async (_, res) => {
     ephemeralKeySecret: ephemeralKey.secret,
     setupIntent: setupIntent.client_secret,
   });
+} catch (error) {
+  res.json({
+    error: error.message,
+  });
+}
 });
 
 app.post('/fetch-payment-methods', async (req, res) => {
+  try {
   const { secret_key } = getKeys();
 
   const stripe = new Stripe(secret_key, {
@@ -745,9 +806,15 @@ app.post('/fetch-payment-methods', async (req, res) => {
   res.json({
     paymentMethods: paymentMethods.data,
   });
+} catch (error) {
+  res.json({
+    error: error.message,
+  });
+}
 });
 
 app.post('/attach-payment-method', async (req, res) => {
+  try {
   const { secret_key } = getKeys();
 
   const stripe = new Stripe(secret_key, {
@@ -763,9 +830,15 @@ app.post('/attach-payment-method', async (req, res) => {
   res.json({
     paymentMethod,
   });
+} catch (error) {
+  res.json({
+    error: error.message,
+  });
+}
 });
 
 app.post('/detach-payment-method', async (req, res) => {
+  try {
   const { secret_key } = getKeys();
 
   const stripe = new Stripe(secret_key, {
@@ -780,18 +853,29 @@ app.post('/detach-payment-method', async (req, res) => {
   res.json({
     paymentMethod,
   });
+} catch (error) {
+  res.json({
+    error: error.message,
+  });
+}
 });
 
 // Mocks a Database. In your code, you should use a persistent database.
 let savedPaymentOptions = new Map();
 
 app.post('/set-payment-option', async (req, res) => {
+  try {
   savedPaymentOptions.set(req.body.customerId, req.body.paymentOption);
   res.json({});
+} catch (error) {
+  res.json({
+    error: error.message,
+  });
+}
 });
 
 app.post('/get-payment-option', async (req, res) => {
-
+  try {
   const { secret_key } = getKeys();
 
   const stripe = new Stripe(secret_key, {
@@ -824,7 +908,19 @@ app.post('/get-payment-option', async (req, res) => {
 
   });
   return res.json({ id: session.id });
+} catch (error) {
+  return res.json({
+    error: error.message,
+  });
+}
 });
+
+// Global error handler middleware
+app.use((err, req, res, next) => {
+  console.error('An error occurred:', err);
+  res.status(500).json({ error: 'Internal server error' });
+});
+
 
 app.listen(4242, () =>
   console.log(`Node server listening on port ${4242}!`)
