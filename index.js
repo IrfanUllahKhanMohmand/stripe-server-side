@@ -496,9 +496,16 @@ app.post('/charge-card-off-session', async (req, res) => {
 
 
 
-app.post('/payment-sheet', async (_, res) => {
+app.post('/payment-sheet', async (req, res) => {
   try {
     const { secret_key } = getKeys();
+    const { currency, amount } = req.body; // Assuming the parameters are passed in the request body
+
+    if (!currency || !amount) {
+      return res.status(400).json({
+        error: 'Currency and amount are required parameters',
+      });
+    }
 
     const stripe = new Stripe(secret_key, {
       apiVersion: '2023-08-16',
@@ -522,8 +529,8 @@ app.post('/payment-sheet', async (_, res) => {
     );
 
     const paymentIntent = await stripe.paymentIntents.create({
-      amount: 5099,
-      currency: 'eur',
+      amount: amount,
+      currency: currency,
       customer: customer.id,
       payment_method_types: ['card'],
     });
@@ -549,6 +556,7 @@ app.post('/payment-sheet', async (_, res) => {
     }
   }
 });
+
 
 
 app.post('/payment-sheet-subscription', async (_, res) => {
