@@ -559,6 +559,9 @@ app.post('/payment-sheet', async (req, res) => {
 
 
 
+
+
+
 app.post('/payment-sheet-subscription', async (_, res) => {
   try {
     const { secret_key } = getKeys();
@@ -724,6 +727,7 @@ app.post('/payment-intent-for-payment-sheet', async (req, res) => {
   }
 });
 
+
 app.post('/create-checkout-session', async (req, res) => {
   try {
   console.log(`Called /create-checkout-session`)
@@ -752,7 +756,23 @@ app.post('/create-checkout-session', async (req, res) => {
     customer: customer.id,
   });
 
+  const session = await stripe.checkout.sessions.create({
+    success_url: `https://checkout.stripe.dev/success`,
+    line_items: [
+      {
+        price: 'price_1Obk3LAcd6N7OZokNUNoJn4Z',
+        quantity: 1,
+      },
+      
+    ],
+    automatic_tax : {
+      enabled: true,
+    },
+    mode: 'payment',
+  });
+
   res.json({
+    sessionId: session.id,
     customer: customer.id,
     ephemeralKeySecret: ephemeralKey.secret,
     setupIntent: setupIntent.client_secret,
@@ -763,6 +783,8 @@ app.post('/create-checkout-session', async (req, res) => {
   });
 }
 });
+
+
 
 app.post('/customer-sheet', async (_, res) => {
   try {
