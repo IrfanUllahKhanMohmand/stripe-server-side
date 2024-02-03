@@ -445,7 +445,7 @@ app.post('/charge-card-off-session', async (req, res) => {
     // Create and confirm a PaymentIntent with the order amount, currency,
     // Customer and PaymentMethod ID
     paymentIntent = await stripe.paymentIntents.create({
-      amount: calculateOrderAmount(),
+      amount: '1099',
       currency: 'usd',
       payment_method: paymentMethods.data[0].id,
       customer: customer.data[0].id,
@@ -491,6 +491,159 @@ app.post('/charge-card-off-session', async (req, res) => {
   }
 });
 
+
+
+
+
+
+
+
+app.post('/list-setup-intents', async (req, res) => {
+  try {
+    const { secret_key } = getKeys();
+
+    const stripe = new Stripe(secret_key, {
+      apiVersion: '2023-08-16',
+      typescript: true,
+    });
+
+    const customerId = 'cus_PUjAhuX2HzZ5UJ';
+
+    const setupIntents = await stripe.setupIntents.list(
+      {
+        customer: customerId,
+      }
+    );
+
+    return res.json({
+      setupIntents: setupIntents.data,
+    });
+  } catch (error) {
+    console.error('Error in payment-sheet endpoint:', error);
+
+    // Handle different types of errors and respond accordingly
+    if (error instanceof Stripe.errors.StripeCardError) {
+      // Handle card errors
+      return res.status(400).json({ error: 'Card error' });
+    } else if (error instanceof Stripe.errors.StripeInvalidRequestError) {
+      // Handle invalid request errors
+      return res.status(400).json({ error: 'Invalid request' });
+    } else {
+      // Handle other types of errors
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+});
+
+
+
+
+app.post('/retrieve-setup-intent', async (req, res) => {
+
+  try {
+    const { secret_key } = getKeys();
+    const { setupIntentId } = req.body; // Assuming the parameters are passed in the request body
+
+    const stripe = new Stripe(secret_key, {
+      apiVersion: '2023-08-16',
+      typescript: true,
+    });
+
+    const setupIntent = await stripe.setupIntents.retrieve(setupIntentId);
+
+    return res.json({
+      setupIntent: setupIntent,
+    });
+  } catch (error) {
+    console.error('Error in payment-sheet endpoint:', error);
+
+    // Handle different types of errors and respond accordingly
+    if (error instanceof Stripe.errors.StripeCardError) {
+      // Handle card errors
+      return res.status(400).json({ error: 'Card error' });
+    } else if (error instanceof Stripe.errors.StripeInvalidRequestError) {
+      // Handle invalid request errors
+      return res.status(400).json({ error: 'Invalid request' });
+    } else {
+      // Handle other types of errors
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+});
+
+
+
+app.post('/cancel-setup-intent', async (req, res) => {
+
+  try {
+    const { secret_key } = getKeys();
+    const { setupIntentId } = req.body; // Assuming the parameters are passed in the request body
+
+    const stripe = new Stripe(secret_key, {
+      apiVersion: '2023-08-16',
+      typescript: true,
+    });
+
+    const setupIntent = await stripe.setupIntents.cancel(setupIntentId);
+
+    return res.json({
+      setupIntent: setupIntent,
+    });
+  } catch (error) {
+    console.error('Error in payment-sheet endpoint:', error);
+
+    // Handle different types of errors and respond accordingly
+    if (error instanceof Stripe.errors.StripeCardError) {
+      // Handle card errors
+      return res.status(400).json({ error: 'Card error' });
+    } else if (error instanceof Stripe.errors.StripeInvalidRequestError) {
+      // Handle invalid request errors
+      return res.status(400).json({ error: 'Invalid request' });
+    } else {
+      // Handle other types of errors
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+});
+
+
+app.post('/update-setup-intent', async (req, res) => {
+
+  try {
+    const { secret_key } = getKeys();
+    const { setupIntentId } = req.body; // Assuming the parameters are passed in the request body
+
+    const stripe = new Stripe(secret_key, {
+      apiVersion: '2023-08-16',
+      typescript: true,
+    });
+
+    const setupIntent = await stripe.setupIntents.cancel(setupIntentId);
+
+    return res.json({
+      setupIntent: setupIntent,
+    });
+  } catch (error) {
+    console.error('Error in payment-sheet endpoint:', error);
+
+    // Handle different types of errors and respond accordingly
+    if (error instanceof Stripe.errors.StripeCardError) {
+      // Handle card errors
+      return res.status(400).json({ error: 'Card error' });
+    } else if (error instanceof Stripe.errors.StripeInvalidRequestError) {
+      // Handle invalid request errors
+      return res.status(400).json({ error: 'Invalid request' });
+    } else {
+      // Handle other types of errors
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+});
+
+
+
+
+
 // This example sets up an endpoint using the Express framework.
 // Watch this video to get started: https://youtu.be/rPR2aJ6XnAc.
 
@@ -512,33 +665,33 @@ app.post('/payment-sheet', async (req, res) => {
       typescript: true,
     });
 
-    const customers = await stripe.customers.list();
+    // const customers = await stripe.customers.list();
 
-    // Here, we're getting the latest customer only for example purposes.
-    const customer = customers.data[0];
+    // // Here, we're getting the latest customer only for example purposes.
+    // const customer = customers.data[0];
 
-    if (!customer) {
-      return res.send({
-        error: 'You have no customer created',
-      });
-    }
-
+    // if (!customer) {
+    //   return res.send({
+    //     error: 'You have no customer created',
+    //   });
+    // }
+    const customerId = 'cus_PUjAhuX2HzZ5UJ';
     const ephemeralKey = await stripe.ephemeralKeys.create(
-      { customer: customer.id },
+      { customer: customerId },
       { apiVersion: '2023-08-16' }
     );
 
     const paymentIntent = await stripe.paymentIntents.create({
       amount: amount,
       currency: currency,
-      customer: customer.id,
+      customer: customerId,
       payment_method_types: ['card'],
     });
 
     return res.json({
       paymentIntent: paymentIntent.client_secret,
       ephemeralKey: ephemeralKey.secret,
-      customer: customer.id,
+      customer: customerId,
     });
   } catch (error) {
     console.error('Error in payment-sheet endpoint:', error);
@@ -556,6 +709,9 @@ app.post('/payment-sheet', async (req, res) => {
     }
   }
 });
+
+
+
 
 
 
@@ -796,20 +952,20 @@ app.post('/customer-sheet', async (_, res) => {
   });
 
   // Use an existing Customer ID if this is a returning customer.
-  const customer = await stripe.customers.create();
-
+  // const customer = await stripe.customers.create();
+  const customerId = 'cus_PUjAhuX2HzZ5UJ';
   // Use the same version as the SDK
   const ephemeralKey = await stripe.ephemeralKeys.create(
-    { customer: customer.id },
+    { customer: customerId },
     { apiVersion: '2020-08-27' }
   );
 
   const setupIntent = await stripe.setupIntents.create({
-    customer: customer.id,
+    customer: customerId,
   });
 
   res.json({
-    customer: customer.id,
+    customer: customerId,
     ephemeralKeySecret: ephemeralKey.secret,
     setupIntent: setupIntent.client_secret,
   });
@@ -835,6 +991,28 @@ app.post('/fetch-payment-methods', async (req, res) => {
 
   res.json({
     paymentMethods: paymentMethods.data,
+  });
+} catch (error) {
+  res.json({
+    error: error.message,
+  });
+}
+});
+
+app.post('/create-payment-method', async (req, res) => {
+  try {
+  const { secret_key } = getKeys();
+  const { params } = req.body;
+
+  const stripe = new Stripe(secret_key, {
+    apiVersion: '2023-08-16',
+    typescript: true,
+  });
+
+  const paymentMethod = await stripe.paymentMethods.create(params);
+
+  res.json({
+    paymentMethod: paymentMethod,
   });
 } catch (error) {
   res.json({
