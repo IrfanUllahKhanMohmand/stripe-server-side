@@ -1,7 +1,7 @@
 // Server code from https://github.com/stripe-samples/accept-a-card-payment/tree/master/using-webhooks/server/node-typescript
 
 // Replace if using a different env file or config.
-require('dotenv').config();
+// require('dotenv').config();
 
 const bodyParser = require('body-parser');
 const express = require('express');
@@ -9,9 +9,13 @@ const Stripe = require('stripe');
 
 const { generateResponse } = require ('./utils');
 
-const stripePublishableKey = process.env.STRIPE_PUBLISHABLE_KEY || '';
-const stripeSecretKey =process.env.STRIPE_SECRET_KEY || '';
-const stripeWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET || '';
+// const stripePublishableKey = process.env.STRIPE_PUBLISHABLE_KEY || '';
+// const stripeSecretKey =process.env.STRIPE_SECRET_KEY || '';
+// const stripeWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET || '';
+
+const stripePublishableKey = 'pk_test_51NcoVuAcd6N7OZokEu7sb9epQ2OYQPkWPbZy4NeZgObByNEV4tKhyWzOjnt9rCyvK01Y3hdiqcuevLqNymfUdXO200wKYseb9V';
+const stripeSecretKey ='sk_test_51NcoVuAcd6N7OZokW9diEdFhLwuLC85c8zN2lAYOd0QbIdwZqrL8vjaDZao8j9prK2bTh7bhRnsNP1ZMKylYhhmk005jJBHd5L';
+const stripeWebhookSecret = 'whsec_';
 
 const app = express();
 
@@ -337,7 +341,7 @@ app.post('/create-setup-intent', async (req, res) => {
 
   // Send publishable key and SetupIntent details to client
   return res.send({
-    publishableKey: process.env.STRIPE_PUBLISHABLE_KEY,
+    publishableKey: stripePublishableKey,
     clientSecret: setupIntent.client_secret,
   });
 } catch (error) {
@@ -652,7 +656,7 @@ app.post('/update-setup-intent', async (req, res) => {
 app.post('/payment-sheet', async (req, res) => {
   try {
     const { secret_key } = getKeys();
-    const { currency, amount } = req.body; // Assuming the parameters are passed in the request body
+    const { currency, amount, email } = req.body;
 
     if (!currency || !amount) {
       return res.status(400).json({
@@ -664,18 +668,18 @@ app.post('/payment-sheet', async (req, res) => {
       apiVersion: '2023-08-16',
       typescript: true,
     });
+    var customerId = '';
+    const customers = await stripe.customers.list({
+      email,
+    });
 
-    // const customers = await stripe.customers.list();
+    if (!customers.data[0]) {
+      const customer = await stripe.customers.create({ email });
+      customerId = customer.id;
+    }else{
+      customerId = customers.data[0].id
+    }
 
-    // // Here, we're getting the latest customer only for example purposes.
-    // const customer = customers.data[0];
-
-    // if (!customer) {
-    //   return res.send({
-    //     error: 'You have no customer created',
-    //   });
-    // }
-    const customerId = 'cus_PUjAhuX2HzZ5UJ';
     const ephemeralKey = await stripe.ephemeralKeys.create(
       { customer: customerId },
       { apiVersion: '2023-08-16' }
@@ -945,15 +949,24 @@ app.post('/create-checkout-session', async (req, res) => {
 app.post('/customer-sheet', async (_, res) => {
   try {
   const { secret_key } = getKeys();
+  const { email } = req.body;
 
   const stripe = new Stripe(secret_key, {
     apiVersion: '2023-08-16',
     typescript: true,
   });
 
-  // Use an existing Customer ID if this is a returning customer.
-  // const customer = await stripe.customers.create();
-  const customerId = 'cus_PUjAhuX2HzZ5UJ';
+  var customerId = '';
+  const customers = await stripe.customers.list({
+    email,
+  });
+
+  if (!customers.data[0]) {
+    const customer = await stripe.customers.create({ email });
+    customerId = customer.id;
+  }else{
+    customerId = customers.data[0].id
+  }
   // Use the same version as the SDK
   const ephemeralKey = await stripe.ephemeralKeys.create(
     { customer: customerId },
